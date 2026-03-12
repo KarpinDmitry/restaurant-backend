@@ -105,6 +105,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Flyway миграции -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
