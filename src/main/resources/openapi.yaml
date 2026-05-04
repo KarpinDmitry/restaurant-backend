@@ -1,0 +1,4389 @@
+openapi: 3.0.3
+info:
+  title: Restaurant Management System API
+  description: |
+    API для системы управления рестораном с поддержкой заказов, меню, блюд и управления сотрудниками.
+
+    Система поддерживает раздельную авторизацию для сотрудников и клиентов через JWT токены.
+
+    Роли пользователей:
+    - **Admin**: Полный доступ ко всем операциям
+    - **Manager**: Управление меню, блюдами, заказами, назначение курьеров
+    - **Courier**: Просмотр назначенных заказов, изменение статуса доставки
+    - **Client**: Просмотр меню, создание заказов, управление своими данными
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@restaurant.com
+
+tags:
+  - name: Authentication (Employees)
+    description: Авторизация для сотрудников
+  - name: Authentication (Clients)
+    description: Авторизация для клиентов
+  - name: Roles
+    description: Управление ролями сотрудников
+  - name: Employees
+    description: Управление сотрудниками
+  - name: Clients
+    description: Управление клиентами
+  - name: Client Addresses
+    description: Управление адресами клиентов
+  - name: Dishes
+    description: Управление блюдами
+  - name: Menus
+    description: Управление меню
+  - name: Ingredients
+    description: Управление ингредиентами
+  - name: Order Statuses
+    description: Управление статусами заказов
+  - name: Orders
+    description: Управление заказами
+  - name: Order Items
+    description: Управление позициями заказов
+
+components:
+  securitySchemes:
+    jwtEmployee:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT токен для сотрудников (Admin, Manager, Courier)
+    jwtClient:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT токен для клиентов
+
+  schemas:
+    EmployeeLoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "manager1"
+        password:
+          type: string
+          format: password
+          example: "password123"
+
+    ClientLoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "client1"
+        password:
+          type: string
+          format: password
+          example: "password123"
+
+    ClientRegisterRequest:
+      type: object
+      required: [first_name, last_name, login, password, email, phone]
+      properties:
+        first_name:
+          type: string
+          example: "Иван"
+        last_name:
+          type: string
+          example: "Иванов"
+        middle_name:
+          type: string
+          example: "Петрович"
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "client1"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: "password123"
+        email:
+          type: string
+          format: email
+          example: "ivan@example.com"
+        phone:
+          type: string
+          example: "+79001234567"
+
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refresh_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          description: Время жизни access токена в секундах
+          example: 3600
+
+    ErrorResponse:
+      type: object
+      required: [error, exception]
+      properties:
+        error:
+          type: string
+          example: "Internal Server Error"
+        exception:
+          type: string
+          example: "An unexpected error occurred while processing the request"
+        message:
+          type: string
+          example: "Invalid credentials"
+        details:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Validation Error"
+        message:
+          type: string
+          example: "Invalid input data"
+        fields:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            login: ["Login must be between 4 and 16 characters"]
+            password: ["Password is required"]
+
+    Role:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Admin"
+
+    Employee:
+      type: object
+      required: [id, first_name, last_name, login, role_id]
+      properties:
+        id:
+          type: integer
+          example: 1
+        first_name:
+          type: string
+          example: "Петр"
+        last_name:
+          type: string
+          example: "Петров"
+        middle_name:
+          type: string
+          nullable: true
+          example: "Иванович"
+        login:
+          type: string
+          example: "manager1"
+        role_id:
+          type: integer
+          example: 2
+        role:
+          $ref: '#/components/schemas/Role'
+        phone:
+          type: string
+          example: "+79001234567"
+        avatar_id:
+          type: integer
+          nullable: true
+          example: 1
+        is_working:
+          type: boolean
+          example: true
+
+    EmployeeCreate:
+      type: object
+      required: [first_name, last_name, login, password, role_id, phone]
+      properties:
+        first_name:
+          type: string
+          example: "Петр"
+        last_name:
+          type: string
+          example: "Петров"
+        middle_name:
+          type: string
+          example: "Иванович"
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "manager1"
+        password:
+          type: string
+          format: password
+          example: "password123"
+        role_id:
+          type: integer
+          example: 2
+        phone:
+          type: string
+          example: "+79001234567"
+        avatar_id:
+          type: integer
+          nullable: true
+          example: 1
+        is_working:
+          type: boolean
+          default: false
+          example: false
+
+    EmployeeUpdate:
+      type: object
+      properties:
+        first_name:
+          type: string
+          example: "Петр"
+        last_name:
+          type: string
+          example: "Петров"
+        middle_name:
+          type: string
+          nullable: true
+          example: "Иванович"
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "manager1"
+        password:
+          type: string
+          format: password
+          example: "newpassword123"
+        role_id:
+          type: integer
+          example: 2
+        phone:
+          type: string
+          example: "+79001234567"
+        avatar_id:
+          type: integer
+          nullable: true
+          example: 1
+        is_working:
+          type: boolean
+          example: true
+
+    Client:
+      type: object
+      required: [id, first_name, last_name, login, email, phone]
+      properties:
+        id:
+          type: integer
+          example: 1
+        first_name:
+          type: string
+          example: "Иван"
+        last_name:
+          type: string
+          example: "Иванов"
+        middle_name:
+          type: string
+          nullable: true
+          example: "Петрович"
+        login:
+          type: string
+          example: "client1"
+        email:
+          type: string
+          format: email
+          example: "ivan@example.com"
+        phone:
+          type: string
+          example: "+79001234567"
+        avatar_id:
+          type: integer
+          nullable: true
+          example: 1
+
+    ClientCreate:
+      type: object
+      required: [first_name, last_name, login, password, email, phone]
+      properties:
+        first_name:
+          type: string
+          example: "Иван"
+        last_name:
+          type: string
+          example: "Иванов"
+        middle_name:
+          type: string
+          example: "Петрович"
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "client1"
+        password:
+          type: string
+          format: password
+          example: "password123"
+        email:
+          type: string
+          format: email
+          example: "ivan@example.com"
+        phone:
+          type: string
+          example: "+79001234567"
+        avatar_id:
+          type: integer
+          nullable: true
+          example: 1
+
+    ClientUpdate:
+      type: object
+      properties:
+        first_name:
+          type: string
+          example: "Иван"
+        last_name:
+          type: string
+          example: "Иванов"
+        middle_name:
+          type: string
+          nullable: true
+          example: "Петрович"
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "client1"
+        password:
+          type: string
+          format: password
+          example: "newpassword123"
+        email:
+          type: string
+          format: email
+          example: "ivan@example.com"
+        phone:
+          type: string
+          example: "+79001234567"
+        avatar_id:
+          type: integer
+          nullable: true
+          example: 1
+
+    ClientAddress:
+      type: object
+      required: [id, client_id, address_text]
+      properties:
+        id:
+          type: integer
+          example: 1
+        client_id:
+          type: integer
+          example: 1
+        address_text:
+          type: string
+          example: "г. Москва, ул. Ленина, д. 10, кв. 5"
+
+    ClientAddressCreate:
+      type: object
+      required: [address_text]
+      properties:
+        address_text:
+          type: string
+          example: "г. Москва, ул. Ленина, д. 10, кв. 5"
+
+    ClientAddressUpdate:
+      type: object
+      properties:
+        address_text:
+          type: string
+          example: "г. Москва, ул. Ленина, д. 10, кв. 5"
+
+    Dish:
+      type: object
+      required: [id, name, weight, calories, price]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Стейк из говядины"
+        weight:
+          type: number
+          format: float
+          example: 300.5
+        calories:
+          type: integer
+          example: 450
+        price:
+          type: number
+          format: decimal
+          example: 1200.00
+        description:
+          type: string
+          example: "Сочный стейк из мраморной говядины"
+
+    DishCreate:
+      type: object
+      required: [name, weight, calories, price]
+      properties:
+        name:
+          type: string
+          example: "Стейк из говядины"
+        weight:
+          type: number
+          format: float
+          example: 300.5
+        calories:
+          type: integer
+          example: 450
+        price:
+          type: number
+          format: decimal
+          example: 1200.00
+        description:
+          type: string
+          example: "Сочный стейк из мраморной говядины"
+
+    DishUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Стейк из говядины"
+        weight:
+          type: number
+          format: float
+          example: 300.5
+        calories:
+          type: integer
+          example: 450
+        price:
+          type: number
+          format: decimal
+          example: 1200.00
+        description:
+          type: string
+          example: "Сочный стейк из мраморной говядины"
+
+    Photo:
+      type: object
+      required: [id, path]
+      properties:
+        id:
+          type: integer
+          example: 1
+        path:
+          type: string
+          example: "/uploads/photos/dish1.jpg"
+
+    DishPhoto:
+      type: object
+      properties:
+        dish_id:
+          type: integer
+          example: 1
+        photo_id:
+          type: integer
+          example: 1
+        dish:
+          $ref: '#/components/schemas/Dish'
+        photo:
+          $ref: '#/components/schemas/Photo'
+
+    DishPhotoCreate:
+      type: object
+      required: [photo_id]
+      properties:
+        photo_id:
+          type: integer
+          example: 1
+
+    Menu:
+      type: object
+      required: [id, name, seasonality, is_active]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Летнее меню"
+        seasonality:
+          type: string
+          example: "Лето"
+        is_active:
+          type: boolean
+          example: true
+
+    MenuCreate:
+      type: object
+      required: [name, seasonality]
+      properties:
+        name:
+          type: string
+          example: "Летнее меню"
+        seasonality:
+          type: string
+          example: "Лето"
+        is_active:
+          type: boolean
+          default: false
+          example: true
+
+    MenuUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Летнее меню"
+        seasonality:
+          type: string
+          example: "Лето"
+        is_active:
+          type: boolean
+          example: true
+
+    MenuDish:
+      type: object
+      properties:
+        menu_id:
+          type: integer
+          example: 1
+        dish_id:
+          type: integer
+          example: 1
+        menu:
+          $ref: '#/components/schemas/Menu'
+        dish:
+          $ref: '#/components/schemas/Dish'
+
+    MenuDishCreate:
+      type: object
+      required: [dish_id]
+      properties:
+        dish_id:
+          type: integer
+          example: 1
+
+    Ingredient:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Говядина"
+
+    IngredientCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: "Говядина"
+
+    IngredientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Говядина"
+
+    DishIngredient:
+      type: object
+      properties:
+        dish_id:
+          type: integer
+          example: 1
+        ingredient_id:
+          type: integer
+          example: 1
+        dish:
+          $ref: '#/components/schemas/Dish'
+        ingredient:
+          $ref: '#/components/schemas/Ingredient'
+
+    DishIngredientCreate:
+      type: object
+      required: [ingredient_id]
+      properties:
+        ingredient_id:
+          type: integer
+          example: 1
+
+    OrderStatus:
+      type: object
+      required: [id, status_name]
+      properties:
+        id:
+          type: integer
+          example: 1
+        status_name:
+          type: string
+          example: "Новый"
+
+    OrderStatusCreate:
+      type: object
+      required: [status_name]
+      properties:
+        status_name:
+          type: string
+          example: "Новый"
+
+    OrderStatusUpdate:
+      type: object
+      properties:
+        status_name:
+          type: string
+          example: "Новый"
+
+    Order:
+      type: object
+      required: [id, client_id, address_id, total_price, created_at]
+      properties:
+        id:
+          type: integer
+          example: 1
+        client_id:
+          type: integer
+          example: 1
+        client:
+          $ref: '#/components/schemas/Client'
+        address_id:
+          type: integer
+          example: 1
+        address:
+          $ref: '#/components/schemas/ClientAddress'
+        manager_id:
+          type: integer
+          nullable: true
+          example: 2
+        manager:
+          $ref: '#/components/schemas/Employee'
+        courier_id:
+          type: integer
+          nullable: true
+          example: 3
+        courier:
+          $ref: '#/components/schemas/Employee'
+        total_price:
+          type: number
+          format: decimal
+          example: 2400.00
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    OrderCreate:
+      type: object
+      required: [address_id, items]
+      properties:
+        address_id:
+          type: integer
+          example: 1
+        items:
+          type: array
+          items:
+            type: object
+            required: [dish_id, quantity]
+            properties:
+              dish_id:
+                type: integer
+                example: 1
+              quantity:
+                type: integer
+                minimum: 1
+                example: 2
+
+    OrderUpdate:
+      type: object
+      properties:
+        address_id:
+          type: integer
+          example: 1
+        manager_id:
+          type: integer
+          nullable: true
+          example: 2
+        courier_id:
+          type: integer
+          nullable: true
+          example: 3
+
+    OrderStatusHistory:
+      type: object
+      required: [id, order_id, status_id, changed_at]
+      properties:
+        id:
+          type: integer
+          example: 1
+        order_id:
+          type: integer
+          example: 1
+        order:
+          $ref: '#/components/schemas/Order'
+        status_id:
+          type: integer
+          example: 2
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        changed_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T11:00:00Z"
+        employee_id:
+          type: integer
+          nullable: true
+          example: 2
+        employee:
+          $ref: '#/components/schemas/Employee'
+        client_id:
+          type: integer
+          nullable: true
+          example: 1
+        client:
+          $ref: '#/components/schemas/Client'
+        comment:
+          type: string
+          example: "Заказ доставлен"
+
+    OrderStatusHistoryCreate:
+      type: object
+      required: [status_id]
+      properties:
+        status_id:
+          type: integer
+          example: 2
+        comment:
+          type: string
+          example: "Заказ доставлен"
+
+    OrderItem:
+      type: object
+      required: [id, order_id, dish_id, quantity, price_at_moment]
+      properties:
+        id:
+          type: integer
+          example: 1
+        order_id:
+          type: integer
+          example: 1
+        order:
+          $ref: '#/components/schemas/Order'
+        dish_id:
+          type: integer
+          example: 1
+        dish:
+          $ref: '#/components/schemas/Dish'
+        quantity:
+          type: integer
+          example: 2
+        price_at_moment:
+          type: number
+          format: decimal
+          example: 1200.00
+
+    OrderItemCreate:
+      type: object
+      required: [dish_id, quantity]
+      properties:
+        dish_id:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    OrderItemUpdate:
+      type: object
+      properties:
+        dish_id:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    RolesList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        total:
+          type: integer
+          example: 3
+
+    EmployeesList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+        total:
+          type: integer
+          example: 10
+
+    ClientsList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Client'
+        total:
+          type: integer
+          example: 50
+
+    ClientAddressesList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAddress'
+        total:
+          type: integer
+          example: 5
+
+    DishesList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dish'
+        total:
+          type: integer
+          example: 30
+
+    MenusList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Menu'
+        total:
+          type: integer
+          example: 4
+
+    IngredientsList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ingredient'
+        total:
+          type: integer
+          example: 20
+
+    OrderStatusesList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatus'
+        total:
+          type: integer
+          example: 5
+
+    OrdersList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        total:
+          type: integer
+          example: 100
+
+    OrderStatusHistoryList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatusHistory'
+        total:
+          type: integer
+          example: 10
+
+    OrderItemsList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        total:
+          type: integer
+          example: 5
+
+paths:
+  /auth/employees/login:
+    post:
+      tags: [Authentication (Employees)]
+      summary: Вход сотрудника
+      description: "Доступ: Публичный"
+      operationId: employeeLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeLoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Неверные учетные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/employees/refresh:
+    post:
+      tags: [Authentication (Employees)]
+      summary: Обновление access токена сотрудника
+      description: "Доступ: Публичный"
+      operationId: employeeRefreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Токен успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Недействительный или истекший refresh токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/clients/register:
+    post:
+      tags: [Authentication (Clients)]
+      summary: Регистрация нового клиента
+      description: "Доступ: Публичный"
+      operationId: clientRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientRegisterRequest'
+      responses:
+        '201':
+          description: Клиент успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Логин или email уже заняты
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/clients/login:
+    post:
+      tags: [Authentication (Clients)]
+      summary: Вход клиента
+      description: "Доступ: Публичный"
+      operationId: clientLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientLoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Неверные учетные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/clients/refresh:
+    post:
+      tags: [Authentication (Clients)]
+      summary: Обновление access токена клиента
+      description: "Доступ: Публичный"
+      operationId: clientRefreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Токен успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Недействительный или истекший refresh токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /roles:
+    get:
+      tags: [Roles]
+      summary: Получить список ролей
+      description: "Доступ: Admin"
+      operationId: getRoles
+      security:
+        - jwtEmployee: []
+      responses:
+        '200':
+          description: Список ролей
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolesList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /roles/{id}:
+    get:
+      tags: [Roles]
+      summary: Получить роль по ID
+      description: "Доступ: Admin"
+      operationId: getRoleById
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Роль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /employees:
+    get:
+      tags: [Employees]
+      summary: Получить список сотрудников
+      description: "Доступ: Admin, Manager"
+      operationId: getEmployees
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: role_id
+          in: query
+          schema:
+            type: integer
+        - name: is_working
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Список сотрудников
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeesList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Employees]
+      summary: Создать сотрудника
+      description: "Доступ: Admin"
+      operationId: createEmployee
+      security:
+        - jwtEmployee: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeCreate'
+      responses:
+        '201':
+          description: Сотрудник создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: Логин уже занят
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /employees/{id}:
+    get:
+      tags: [Employees]
+      summary: Получить сотрудника по ID
+      description: "Доступ: Admin, Manager (любой), Employee (только себя)"
+      operationId: getEmployeeById
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Сотрудник
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Employees]
+      summary: Полное обновление сотрудника
+      description: "Доступ: Admin"
+      operationId: updateEmployee
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeUpdate'
+      responses:
+        '200':
+          description: Сотрудник обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Employees]
+      summary: Частичное обновление сотрудника
+      description: "Доступ: Admin, Manager (для подчиненных)"
+      operationId: patchEmployee
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeUpdate'
+      responses:
+        '200':
+          description: Сотрудник обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Employees]
+      summary: Удалить сотрудника
+      description: "Доступ: Admin"
+      operationId: deleteEmployee
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Сотрудник удален
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /clients:
+    get:
+      tags: [Clients]
+      summary: Получить список клиентов
+      description: "Доступ: Admin, Manager"
+      operationId: getClients
+      security:
+        - jwtEmployee: []
+      responses:
+        '200':
+          description: Список клиентов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientsList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Clients]
+      summary: Создать клиента
+      description: "Доступ: Admin, Manager"
+      operationId: createClient
+      security:
+        - jwtEmployee: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCreate'
+      responses:
+        '201':
+          description: Клиент создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          description: Логин или email уже заняты
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /clients/{id}:
+    get:
+      tags: [Clients]
+      summary: Получить клиента по ID
+      description: "Доступ: Admin, Manager (любой), Client (только себя)"
+      operationId: getClientById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Клиент
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Clients]
+      summary: Полное обновление клиента
+      description: "Доступ: Admin, Manager"
+      operationId: updateClient
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientUpdate'
+      responses:
+        '200':
+          description: Клиент обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Clients]
+      summary: Частичное обновление клиента
+      description: "Доступ: Admin, Manager, Client (для себя)"
+      operationId: patchClient
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientUpdate'
+      responses:
+        '200':
+          description: Клиент обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Clients]
+      summary: Удалить клиента
+      description: "Доступ: Admin"
+      operationId: deleteClient
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Клиент удален
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /clients/{clientId}/addresses:
+    get:
+      tags: [Client Addresses]
+      summary: Получить адреса клиента
+      description: "Доступ: Admin, Manager, Client (только свои)"
+      operationId: getClientAddresses
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список адресов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAddressesList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Client Addresses]
+      summary: Создать адрес клиента
+      description: "Доступ: Admin, Manager, Client (для себя)"
+      operationId: createClientAddress
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientAddressCreate'
+      responses:
+        '201':
+          description: Адрес создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAddress'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /clients/{clientId}/addresses/{id}:
+    get:
+      tags: [Client Addresses]
+      summary: Получить адрес по ID
+      description: "Доступ: Admin, Manager, Client (только свои)"
+      operationId: getClientAddressById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Адрес
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAddress'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Client Addresses]
+      summary: Полное обновление адреса
+      description: "Доступ: Admin, Manager, Client (для своих)"
+      operationId: updateClientAddress
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientAddressUpdate'
+      responses:
+        '200':
+          description: Адрес обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAddress'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Client Addresses]
+      summary: Частичное обновление адреса
+      description: "Доступ: Admin, Manager, Client (для своих)"
+      operationId: patchClientAddress
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientAddressUpdate'
+      responses:
+        '200':
+          description: Адрес обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAddress'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Client Addresses]
+      summary: Удалить адрес
+      description: "Доступ: Admin, Manager, Client (для своих)"
+      operationId: deleteClientAddress
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Адрес удален
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dishes:
+    get:
+      tags: [Dishes]
+      summary: Получить список блюд
+      description: "Доступ: Все авторизованные"
+      operationId: getDishes
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      responses:
+        '200':
+          description: Список блюд
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishesList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Dishes]
+      summary: Создать блюдо
+      description: "Доступ: Admin, Manager"
+      operationId: createDish
+      security:
+        - jwtEmployee: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishCreate'
+      responses:
+        '201':
+          description: Блюдо создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dishes/{id}:
+    get:
+      tags: [Dishes]
+      summary: Получить блюдо по ID
+      description: "Доступ: Все авторизованные"
+      operationId: getDishById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Блюдо
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Dishes]
+      summary: Полное обновление блюда
+      description: "Доступ: Admin, Manager"
+      operationId: updateDish
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishUpdate'
+      responses:
+        '200':
+          description: Блюдо обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Dishes]
+      summary: Частичное обновление блюда
+      description: "Доступ: Admin, Manager"
+      operationId: patchDish
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishUpdate'
+      responses:
+        '200':
+          description: Блюдо обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Dishes]
+      summary: Удалить блюдо
+      description: "Доступ: Admin, Manager"
+      operationId: deleteDish
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Блюдо удалено
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dishes/{dishId}/photos:
+    get:
+      tags: [Dishes]
+      summary: Получить фотографии блюда
+      description: "Доступ: Все авторизованные"
+      operationId: getDishPhotos
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: dishId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список фотографий
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Photo'
+                  total:
+                    type: integer
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Блюдо не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Dishes]
+      summary: Привязать фото к блюду
+      description: "Доступ: Admin, Manager"
+      operationId: createDishPhoto
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: dishId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishPhotoCreate'
+      responses:
+        '201':
+          description: Фото привязано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishPhoto'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Блюдо или фото не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dishes/{dishId}/photos/{photoId}:
+    delete:
+      tags: [Dishes]
+      summary: Отвязать фото от блюда
+      description: "Доступ: Admin, Manager"
+      operationId: deleteDishPhoto
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: dishId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Фото отвязано
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Связь не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dishes/{dishId}/ingredients:
+    get:
+      tags: [Dishes]
+      summary: Получить ингредиенты блюда
+      description: "Доступ: Все авторизованные"
+      operationId: getDishIngredients
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: dishId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список ингредиентов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ingredient'
+                  total:
+                    type: integer
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Блюдо не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Dishes]
+      summary: Добавить ингредиент к блюду
+      description: "Доступ: Admin, Manager"
+      operationId: createDishIngredient
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: dishId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishIngredientCreate'
+      responses:
+        '201':
+          description: Ингредиент добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishIngredient'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Блюдо или ингредиент не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dishes/{dishId}/ingredients/{ingredientId}:
+    delete:
+      tags: [Dishes]
+      summary: Удалить ингредиент из блюда
+      description: "Доступ: Admin, Manager"
+      operationId: deleteDishIngredient
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: dishId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: ingredientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Ингредиент удален
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Связь не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /menus:
+    get:
+      tags: [Menus]
+      summary: Получить список меню
+      description: "Доступ: Все авторизованные. Клиенты видят только активные меню"
+      operationId: getMenus
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Список меню
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenusList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Menus]
+      summary: Создать меню
+      description: "Доступ: Admin, Manager"
+      operationId: createMenu
+      security:
+        - jwtEmployee: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuCreate'
+      responses:
+        '201':
+          description: Меню создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /menus/{id}:
+    get:
+      tags: [Menus]
+      summary: Получить меню по ID
+      description: "Доступ: Все авторизованные"
+      operationId: getMenuById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Меню
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Menus]
+      summary: Полное обновление меню
+      description: "Доступ: Admin, Manager"
+      operationId: updateMenu
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuUpdate'
+      responses:
+        '200':
+          description: Меню обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Menus]
+      summary: Частичное обновление меню
+      description: "Доступ: Admin, Manager"
+      operationId: patchMenu
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuUpdate'
+      responses:
+        '200':
+          description: Меню обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Menus]
+      summary: Удалить меню
+      description: "Доступ: Admin, Manager"
+      operationId: deleteMenu
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Меню удалено
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /menus/{menuId}/dishes:
+    get:
+      tags: [Menus]
+      summary: Получить блюда в меню
+      description: "Доступ: Все авторизованные"
+      operationId: getMenuDishes
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: menuId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список блюд
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Dish'
+                  total:
+                    type: integer
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Меню не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Menus]
+      summary: Добавить блюдо в меню
+      description: "Доступ: Admin, Manager"
+      operationId: createMenuDish
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: menuId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuDishCreate'
+      responses:
+        '201':
+          description: Блюдо добавлено в меню
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuDish'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Меню или блюдо не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /menus/{menuId}/dishes/{dishId}:
+    delete:
+      tags: [Menus]
+      summary: Удалить блюдо из меню
+      description: "Доступ: Admin, Manager"
+      operationId: deleteMenuDish
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: menuId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: dishId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Блюдо удалено из меню
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Связь не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /ingredients:
+    get:
+      tags: [Ingredients]
+      summary: Получить список ингредиентов
+      description: "Доступ: Все авторизованные"
+      operationId: getIngredients
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      responses:
+        '200':
+          description: Список ингредиентов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngredientsList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Ingredients]
+      summary: Создать ингредиент
+      description: "Доступ: Admin, Manager"
+      operationId: createIngredient
+      security:
+        - jwtEmployee: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientCreate'
+      responses:
+        '201':
+          description: Ингредиент создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /ingredients/{id}:
+    get:
+      tags: [Ingredients]
+      summary: Получить ингредиент по ID
+      description: "Доступ: Все авторизованные"
+      operationId: getIngredientById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Ингредиент
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Ingredients]
+      summary: Полное обновление ингредиента
+      description: "Доступ: Admin, Manager"
+      operationId: updateIngredient
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientUpdate'
+      responses:
+        '200':
+          description: Ингредиент обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Ingredients]
+      summary: Частичное обновление ингредиента
+      description: "Доступ: Admin, Manager"
+      operationId: patchIngredient
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientUpdate'
+      responses:
+        '200':
+          description: Ингредиент обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Ingredients]
+      summary: Удалить ингредиент
+      description: "Доступ: Admin, Manager"
+      operationId: deleteIngredient
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Ингредиент удален
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /order-statuses:
+    get:
+      tags: [Order Statuses]
+      summary: Получить список статусов заказов
+      description: "Доступ: Все авторизованные"
+      operationId: getOrderStatuses
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      responses:
+        '200':
+          description: Список статусов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatusesList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Order Statuses]
+      summary: Создать статус заказа
+      description: "Доступ: Admin"
+      operationId: createOrderStatus
+      security:
+        - jwtEmployee: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusCreate'
+      responses:
+        '201':
+          description: Статус создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /order-statuses/{id}:
+    get:
+      tags: [Order Statuses]
+      summary: Получить статус по ID
+      description: "Доступ: Admin, Manager"
+      operationId: getOrderStatusById
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Статус
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Order Statuses]
+      summary: Полное обновление статуса
+      description: "Доступ: Admin"
+      operationId: updateOrderStatus
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusUpdate'
+      responses:
+        '200':
+          description: Статус обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Order Statuses]
+      summary: Частичное обновление статуса
+      description: "Доступ: Admin"
+      operationId: patchOrderStatus
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusUpdate'
+      responses:
+        '200':
+          description: Статус обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Order Statuses]
+      summary: Удалить статус
+      description: "Доступ: Admin"
+      operationId: deleteOrderStatus
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Статус удален
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Получить список заказов
+      description: "Доступ: Admin, Manager (все), Courier (назначенные), Client (свои)"
+      operationId: getOrders
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: client_id
+          in: query
+          schema:
+            type: integer
+        - name: courier_id
+          in: query
+          schema:
+            type: integer
+        - name: status_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список заказов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdersList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Orders]
+      summary: Создать заказ
+      description: "Доступ: Client, Manager"
+      operationId: createOrder
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+      responses:
+        '201':
+          description: Заказ создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Адрес или блюдо не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Получить заказ по ID
+      description: "Доступ: Admin, Manager (любой), Courier (назначенные), Client (свои)"
+      operationId: getOrderById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Заказ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Orders]
+      summary: Полное обновление заказа
+      description: "Доступ: Admin, Manager"
+      operationId: updateOrder
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderUpdate'
+      responses:
+        '200':
+          description: Заказ обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Orders]
+      summary: Частичное обновление заказа
+      description: "Доступ: Admin, Manager, Courier (для назначенных)"
+      operationId: patchOrder
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderUpdate'
+      responses:
+        '200':
+          description: Заказ обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Orders]
+      summary: Удалить заказ
+      description: "Доступ: Admin"
+      operationId: deleteOrder
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Заказ удален
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{orderId}/status-history:
+    get:
+      tags: [Orders]
+      summary: Получить историю статусов заказа
+      description: "Доступ: Admin, Manager (любой), Courier (назначенные), Client (свои)"
+      operationId: getOrderStatusHistory
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: История статусов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatusHistoryList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Заказ не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Orders]
+      summary: Изменить статус заказа
+      description: "Доступ: Admin, Manager, Courier (назначенные), Client (свои)"
+      operationId: createOrderStatusHistory
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusHistoryCreate'
+      responses:
+        '201':
+          description: Статус изменен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatusHistory'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Заказ или статус не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{orderId}/items:
+    get:
+      tags: [Order Items]
+      summary: Получить позиции заказа
+      description: "Доступ: Все авторизованные с доступом к заказу"
+      operationId: getOrderItems
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список позиций
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItemsList'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Заказ не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Order Items]
+      summary: Добавить позицию в заказ
+      description: "Доступ: Client (свои заказы), Manager"
+      operationId: createOrderItem
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItemCreate'
+      responses:
+        '201':
+          description: Позиция добавлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Заказ или блюдо не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{orderId}/items/{id}:
+    get:
+      tags: [Order Items]
+      summary: Получить позицию заказа по ID
+      description: "Доступ: Все авторизованные с доступом к заказу"
+      operationId: getOrderItemById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Позиция
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Order Items]
+      summary: Полное обновление позиции
+      description: "Доступ: Admin, Manager"
+      operationId: updateOrderItem
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItemUpdate'
+      responses:
+        '200':
+          description: Позиция обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Order Items]
+      summary: Частичное обновление позиции
+      description: "Доступ: Admin, Manager"
+      operationId: patchOrderItem
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItemUpdate'
+      responses:
+        '200':
+          description: Позиция обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Order Items]
+      summary: Удалить позицию из заказа
+      description: "Доступ: Admin, Manager, Client (свои заказы)"
+      operationId: deleteOrderItem
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Позиция удалена
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
