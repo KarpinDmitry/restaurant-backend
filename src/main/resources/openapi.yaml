@@ -654,22 +654,7 @@ components:
           example: 1
         status_name:
           type: string
-          example: "Новый"
-
-    OrderStatusCreate:
-      type: object
-      required: [status_name]
-      properties:
-        status_name:
-          type: string
-          example: "Новый"
-
-    OrderStatusUpdate:
-      type: object
-      properties:
-        status_name:
-          type: string
-          example: "Новый"
+          example: "NEW"
 
     Order:
       type: object
@@ -3394,7 +3379,7 @@ paths:
     get:
       tags: [Order Statuses]
       summary: Получить список статусов заказов
-      description: "Доступ: Все авторизованные"
+      description: "Доступ: Все авторизованные. Набор статусов фиксированный, управляется миграциями."
       operationId: getOrderStatuses
       security:
         - jwtEmployee: []
@@ -3418,59 +3403,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-    post:
-      tags: [Order Statuses]
-      summary: Создать статус заказа
-      description: "Доступ: Admin"
-      operationId: createOrderStatus
-      security:
-        - jwtEmployee: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderStatusCreate'
-      responses:
-        '201':
-          description: Статус создан
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderStatus'
-        '401':
-          description: Не авторизован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Недостаточно прав
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Ошибка валидации
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationError'
-        '500':
-          description: Внутренняя ошибка сервера
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
   /order-statuses/{id}:
     get:
       tags: [Order Statuses]
       summary: Получить статус по ID
-      description: "Доступ: Admin, Manager"
+      description: "Доступ: Все авторизованные"
       operationId: getOrderStatusById
       security:
         - jwtEmployee: []
+        - jwtClient: []
       parameters:
         - name: id
           in: path
@@ -3486,164 +3428,6 @@ paths:
                 $ref: '#/components/schemas/OrderStatus'
         '401':
           description: Не авторизован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Недостаточно прав
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Не найдено
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Внутренняя ошибка сервера
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    put:
-      tags: [Order Statuses]
-      summary: Полное обновление статуса
-      description: "Доступ: Admin"
-      operationId: updateOrderStatus
-      security:
-        - jwtEmployee: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderStatusUpdate'
-      responses:
-        '200':
-          description: Статус обновлен
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderStatus'
-        '401':
-          description: Не авторизован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Недостаточно прав
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Не найдено
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Ошибка валидации
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationError'
-        '500':
-          description: Внутренняя ошибка сервера
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    patch:
-      tags: [Order Statuses]
-      summary: Частичное обновление статуса
-      description: "Доступ: Admin"
-      operationId: patchOrderStatus
-      security:
-        - jwtEmployee: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderStatusUpdate'
-      responses:
-        '200':
-          description: Статус обновлен
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderStatus'
-        '401':
-          description: Не авторизован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Недостаточно прав
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Не найдено
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Ошибка валидации
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationError'
-        '500':
-          description: Внутренняя ошибка сервера
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    delete:
-      tags: [Order Statuses]
-      summary: Удалить статус
-      description: "Доступ: Admin"
-      operationId: deleteOrderStatus
-      security:
-        - jwtEmployee: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '204':
-          description: Статус удален
-        '401':
-          description: Не авторизован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Недостаточно прав
           content:
             application/json:
               schema:

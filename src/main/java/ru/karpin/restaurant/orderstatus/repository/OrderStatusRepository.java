@@ -4,8 +4,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import ru.karpin.restaurant.orderstatus.entity.OrderStatus;
 
 public interface OrderStatusRepository extends JpaRepository<OrderStatus, Long> {
-
-    boolean existsByStatusNameIgnoreCase(String statusName);
-
-    boolean existsByStatusNameIgnoreCaseAndIdNot(String statusName, Long id);
 }
