@@ -8,9 +8,11 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import ru.karpin.restaurant.common.dto.ErrorResponse;
 import ru.karpin.restaurant.common.dto.ValidationErrorResponse;
 import ru.karpin.restaurant.common.exception.DuplicateResourceException;
+import ru.karpin.restaurant.common.exception.InvalidFileException;
 import ru.karpin.restaurant.common.exception.ResourceNotFoundException;
 
 import java.util.List;
@@ -49,6 +51,18 @@ public class GlobalExceptionHandler {
         log.warn("Data integrity violation", e);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.of("Bad Request", "Data integrity violation", e.getMostSpecificCause().getMessage()));
+    }
+
+    @ExceptionHandler(InvalidFileException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidFile(InvalidFileException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of("Bad Request", "Invalid file", e.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ErrorResponse.of("Payload Too Large", "Uploaded file exceeds the size limit", e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
