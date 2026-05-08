@@ -31,6 +31,8 @@ tags:
     description: Управление адресами клиентов
   - name: Dishes
     description: Управление блюдами
+  - name: Photos
+    description: Загрузка и удаление файлов-фотографий
   - name: Menus
     description: Управление меню
   - name: Ingredients
@@ -2691,6 +2693,139 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Связь не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /photos:
+    post:
+      tags: [Photos]
+      summary: Загрузить фото
+      description: "Доступ: Все авторизованные. Multipart-форма с полем 'file' (jpeg/png/webp, до 10 MB). Возвращает метаданные с URL для GET статики."
+      operationId: uploadPhoto
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Фото загружено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+        '400':
+          description: Неподдерживаемый формат файла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Файл превышает лимит размера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /photos/{id}:
+    get:
+      tags: [Photos]
+      summary: Получить метаданные фото
+      description: "Доступ: Все авторизованные"
+      operationId: getPhotoById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Фото
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Photos]
+      summary: Удалить фото
+      description: "Доступ: Admin, Manager. Удаляет файл с диска и запись из БД. Связки с блюдами через dish_photos удаляются каскадно."
+      operationId: deletePhoto
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Фото удалено
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
           content:
             application/json:
               schema:
