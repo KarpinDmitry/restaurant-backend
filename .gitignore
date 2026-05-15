@@ -36,3 +36,6 @@ build/
 .DS_Store
 
 .env
+
+### Uploaded files (local dev) ###
+uploads/
