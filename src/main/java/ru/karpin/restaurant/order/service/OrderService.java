@@ -44,7 +44,7 @@ public class OrderService {
         if (clientId != null) {
             orders = orderRepository.findByClient_Id(clientId);
         } else if (courierId != null) {
-            orders = orderRepository.findByCourier_Id(courierId);
+            orders = orderRepository.findByCourier_UserId(courierId);
         } else {
             orders = orderRepository.findAll();
         }
