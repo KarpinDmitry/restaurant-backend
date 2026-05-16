@@ -1,6 +1,7 @@
 package ru.karpin.restaurant.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,15 @@ public class UserService {
         newUser.setUserType(userType);
 
         return userRepository.save(newUser);
+    }
+
+    public User findEntityByLogin(String login){
+        return userRepository.findByLogin(login)
+                .orElseThrow(() -> new UsernameNotFoundException("Не найден: " + login));
+    }
+
+    public User findEntityById(Long id){
+        return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     public void updatePassword(Long userId, String password){
