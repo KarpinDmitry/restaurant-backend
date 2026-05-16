@@ -1,4 +1,4 @@
-package ru.karpin.restaurant.auth.entity;
+package ru.karpin.restaurant.user.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

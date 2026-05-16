@@ -33,6 +33,8 @@ tags:
     description: Управление блюдами
   - name: Photos
     description: Загрузка и удаление файлов-фотографий
+  - name: Avatars
+    description: Загрузка и удаление аватаров сотрудников и клиентов
   - name: Menus
     description: Управление меню
   - name: Ingredients
@@ -302,6 +304,43 @@ components:
           type: boolean
           example: true
 
+    EmployeePut:
+      type: object
+      required: [first_name, last_name, login, role_id, phone]
+      properties:
+        first_name:
+          type: string
+          example: "Петр"
+        last_name:
+          type: string
+          example: "Петров"
+        middle_name:
+          type: string
+          nullable: true
+          example: "Иванович"
+        login:
+          type: string
+          minLength: 4
+          maxLength: 16
+          example: "manager1"
+        password:
+          type: string
+          format: password
+          example: "newpassword123"
+        role_id:
+          type: integer
+          example: 2
+        phone:
+          type: string
+          example: "+79001234567"
+        avatar_id:
+          type: integer
+          nullable: true
+          example: 1
+        is_working:
+          type: boolean
+          example: true
+
     Client:
       type: object
       required: [id, first_name, last_name, login, email, phone]
@@ -509,6 +548,17 @@ components:
         path:
           type: string
           example: "/uploads/photos/dish1.jpg"
+
+    Avatar:
+      type: object
+      required: [id, path]
+      properties:
+        id:
+          type: integer
+          example: 1
+        path:
+          type: string
+          example: "/uploads/avatars/a3f1c2d4-uuid.jpg"
 
     DishPhoto:
       type: object
@@ -1376,7 +1426,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmployeeUpdate'
+              $ref: '#/components/schemas/EmployeePut'
       responses:
         '200':
           description: Сотрудник обновлен
@@ -2797,6 +2847,139 @@ paths:
       responses:
         '204':
           description: Фото удалено
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /avatars:
+    post:
+      tags: [Avatars]
+      summary: Загрузить аватар
+      description: "Доступ: Все авторизованные. Multipart-форма с полем 'file' (jpeg/png/webp, до 10 MB). Возвращает метаданные с URL."
+      operationId: uploadAvatar
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Аватар загружен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Avatar'
+        '400':
+          description: Неподдерживаемый формат файла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Файл превышает лимит размера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /avatars/{id}:
+    get:
+      tags: [Avatars]
+      summary: Получить метаданные аватара
+      description: "Доступ: Все авторизованные"
+      operationId: getAvatarById
+      security:
+        - jwtEmployee: []
+        - jwtClient: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Аватар
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Avatar'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Avatars]
+      summary: Удалить аватар
+      description: "Доступ: Admin, Manager. Удаляет файл с диска и запись из БД. Связка с сотрудником/клиентом обнуляется на стороне employee/client (SET NULL)."
+      operationId: deleteAvatar
+      security:
+        - jwtEmployee: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Аватар удалён
         '401':
           description: Не авторизован
           content:

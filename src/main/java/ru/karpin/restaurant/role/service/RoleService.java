@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.karpin.restaurant.common.dto.ListResponse;
 import ru.karpin.restaurant.common.exception.ResourceNotFoundException;
 import ru.karpin.restaurant.role.dto.RoleResponse;
+import ru.karpin.restaurant.role.entity.Role;
 import ru.karpin.restaurant.role.mapper.RoleMapper;
 import ru.karpin.restaurant.role.repository.RoleRepository;
 
@@ -26,9 +27,12 @@ public class RoleService {
         return ListResponse.of(data);
     }
 
-    public RoleResponse findById(Long id) {
+    public Role findEntityById(Long id) {
         return repository.findById(id)
-                .map(mapper::toResponse)
-                .orElseThrow(() -> new ResourceNotFoundException("Role with id " + id + " not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + id));
+    }
+
+    public RoleResponse findById(Long id) {
+        return mapper.toResponse(findEntityById(id));
     }
 }
